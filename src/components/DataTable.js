@@ -1,11 +1,13 @@
-// src/components/DataTable.js
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import axios from 'axios';
 
 const DataTable = () => {
   const [data, setData] = useState([]);
-  const [selectedData, setSelectedData] = useState([]); // Separate state for selected data
+  const [selectedData, setSelectedData] = useState(() => {
+    const storedData = localStorage.getItem('selectedData');
+    return storedData ? JSON.parse(storedData) : [];
+  });
   const [chartData, setChartData] = useState({
     x: [],
     y: [],
@@ -22,7 +24,9 @@ const DataTable = () => {
 
   useEffect(() => {
     updateChartData();
-  }, [selectedData, currentPage]); // Update when selectedData or currentPage changes
+    
+    localStorage.setItem('selectedData', JSON.stringify(selectedData));
+  }, [selectedData, currentPage]);  
 
   const fetchData = async () => {
     try {
@@ -40,14 +44,23 @@ const DataTable = () => {
     const xValues = selectedData.map((row) => row.title);
     const yValues = selectedData.map((row) => row.id);
     const colors = Array.from({ length: selectedData.length }, () => getRandomColor());
-
+  
     setChartData({
       x: xValues,
       y: yValues,
       type: 'bar',
-      marker: { color: colors },
+      marker: {
+        color: colors,
+        line: {
+          color: 'rgba(255, 255, 255, 0.7)',  
+          width: 1.5,
+        },
+      },
+      hoverinfo: 'y+text', 
+      hovertext: selectedData.map((row) => `ID: ${row.id}`),
     });
   };
+  
 
   const getRandomColor = () => {
     const letters = '0123456789ABCDEF';
@@ -82,7 +95,7 @@ const DataTable = () => {
   return (
     <div className="container mx-auto my-8 p-8 bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 rounded shadow-2xl">
       <div className="mb-4 flex items-center space-x-4">
-      <input
+        <input
           type="text"
           placeholder="Search..."
           value={searchTerm}
@@ -103,7 +116,7 @@ const DataTable = () => {
         ))}
       </div>
       <div className="flex">
-      <div className="w-1/2 p-4">
+        <div className="w-1/2 p-4">
           <table className="table-auto bg-white bg-opacity-70 shadow-md rounded-md w-full">
             <thead>
               <tr>
