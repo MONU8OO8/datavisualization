@@ -46,7 +46,7 @@ const DataTable = () => {
         `https://jsonplaceholder.typicode.com/posts?_page=${currentPage}&_limit=${numToShow}&q=${searchTerm}`
       ); 
       setData(response.data);
-      setTotalPages(Math.ceil(response.headers['x-total-count'] / numToShow));  
+      setTotalPages(Math.ceil(response.headers['x-total-count'] / 5));  
     } catch (error) {
       console.error('Error fetching data:', error);
     }
