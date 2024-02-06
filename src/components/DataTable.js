@@ -17,50 +17,74 @@ const DataTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [initialSelectionDone, setInitialSelectionDone] = useState(false);
+  const [numToShow, setNumToShow] = useState(5);
 
   useEffect(() => {
-    fetchData();
-  }, [currentPage, searchTerm]);
+    if (numToShow > 0) {
+      fetchData();
+    }
+  }, [currentPage, searchTerm, itemsPerPage, numToShow]);
 
   useEffect(() => {
     updateChartData();
-    
+
     localStorage.setItem('selectedData', JSON.stringify(selectedData));
-  }, [selectedData, currentPage]);  
+  }, [selectedData]);
+
+  useEffect(() => {
+    if (!initialSelectionDone && data.length > 0) {
+      setSelectedData(data.slice(0, numToShow));
+      setInitialSelectionDone(true);
+    }
+  }, [data, initialSelectionDone, numToShow]); 
 
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        `https://jsonplaceholder.typicode.com/posts?_page=${currentPage}&_limit=5&q=${searchTerm}`
-      );
+        `https://jsonplaceholder.typicode.com/posts?_page=${currentPage}&_limit=${numToShow}&q=${searchTerm}`
+      ); 
       setData(response.data);
-      setTotalPages(Math.ceil(response.headers['x-total-count'] / 5));
+      setTotalPages(Math.ceil(response.headers['x-total-count'] / numToShow));  
     } catch (error) {
       console.error('Error fetching data:', error);
     }
   };
 
   const updateChartData = () => {
-    const xValues = selectedData.map((row) => row.title);
-    const yValues = selectedData.map((row) => row.id);
-    const colors = Array.from({ length: selectedData.length }, () => getRandomColor());
-  
+    const prevXValues = chartData.x;
+    const prevYValues = chartData.y;
+
+    const newXValues = selectedData.map((row) => row.title);
+    const newYValues = selectedData.map((row) => row.id);
+
+    const addedXValues = newXValues.filter((x) => !prevXValues.includes(x));
+    const addedYValues = newYValues.filter((y) => !prevYValues.includes(y));
+
+    const newColors = Array.from({ length: addedXValues.length }, () => getRandomColor());
+
+    const updatedXValues = [...prevXValues, ...addedXValues];
+    const updatedYValues = [...prevYValues, ...addedYValues];
+    const updatedColors = [...chartData.marker.color, ...newColors];
+
     setChartData({
-      x: xValues,
-      y: yValues,
+      x: updatedXValues,
+      y: updatedYValues,
       type: 'bar',
       marker: {
-        color: colors,
+        color: updatedColors,
         line: {
-          color: 'rgba(255, 255, 255, 0.7)',  
+          color: 'rgba(255, 255, 255, 0.7)',
           width: 1.5,
         },
       },
-      hoverinfo: 'y+text', 
+      hoverinfo: 'y+text',
       hovertext: selectedData.map((row) => `ID: ${row.id}`),
     });
   };
-  
+
+
 
   const getRandomColor = () => {
     const letters = '0123456789ABCDEF';
@@ -76,10 +100,38 @@ const DataTable = () => {
 
     if (selectedData.some((row) => row.id === id)) {
       setSelectedData((prevData) => prevData.filter((row) => row.id !== id));
+    
+      setChartData((prevChartData) => {
+        const updatedXValues = prevChartData.x.filter((x) => x !== updatedData.title);
+        const updatedYValues = prevChartData.y.filter((y) => y !== updatedData.id);
+        const updatedColors = prevChartData.marker.color.filter((_, index) => {
+          return prevChartData.x[index] !== updatedData.title;
+        });
+        return {
+          ...prevChartData,
+          x: updatedXValues,
+          y: updatedYValues,
+          marker: {
+            ...prevChartData.marker,
+            color: updatedColors,
+          },
+        };
+      });
     } else {
       setSelectedData((prevData) => [...prevData, updatedData]);
+       
+      setChartData((prevChartData) => ({
+        ...prevChartData,
+        x: [...prevChartData.x, updatedData.title],
+        y: [...prevChartData.y, updatedData.id],
+        marker: {
+          ...prevChartData.marker,
+          color: [...prevChartData.marker.color, getRandomColor()],
+        },
+      }));
     }
   };
+
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -92,28 +144,43 @@ const DataTable = () => {
 
   const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
 
+  const handleNumToShowChange = (value) => {
+    setNumToShow(value);
+  };
+
   return (
     <div className="container mx-auto my-8 p-8 bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 rounded shadow-2xl">
-      <div className="mb-4 flex items-center space-x-4">
-        <input
-          type="text"
-          placeholder="Search..."
-          value={searchTerm}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="p-2 border border-white rounded bg-opacity-70 focus:outline-none"
-        />
+      <div className="mb-4 items-center space-x-4">
+
+
         <span className="text-sm text-gray-600">Page:</span>
         {totalPagesArray.map((page) => (
           <button
             key={page}
             onClick={() => handlePageChange(page)}
-            className={`p-2 rounded ${
-              page === currentPage ? 'bg-blue-500 text-white' : 'bg-white text-black'
-            }`}
+            className={`p-2 rounded ${page === currentPage ? 'bg-blue-500 text-white' : 'bg-white text-black'
+              }`}
           >
             {page}
           </button>
         ))}
+
+        <div className="mt-2">
+          <input
+            type="text"
+            placeholder="Number of items to show"
+            value={numToShow}
+            onChange={(e) => handleNumToShowChange(e.target.value)}
+            className="p-2 mr-2 border border-white rounded bg-opacity-70 focus:outline-none"
+          />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="p-2 border border-white rounded bg-opacity-70 focus:outline-none"
+          />
+        </div>
       </div>
       <div className="flex">
         <div className="w-1/2 p-4">
